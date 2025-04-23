@@ -1,0 +1,84 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>SOS-Бот — Жест помощи</title>
+  <style>
+    body { font-family: sans-serif; text-align: center; padding: 20px; }
+    video { width: 300px; border: 2px solid #ccc; border-radius: 10px; }
+    #status, #serialStatus { font-size: 1.2em; margin-top: 10px; }
+    button { padding: 10px 20px; font-size: 1em; margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <h1>SOS-Бот — Помощь рядом</h1>
+  <div id=""webcam" autoplay playsinline muted></div>
+  <div id="status">Ожидание модели...</div>
+  <button onclick="connectToArduino()">🔌 Подключиться к Arduino</button>
+  <div id="serialStatus">Статус порта: не подключено</div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8/dist/teachablemachine-image.min.js"></script>
+  <script>
+    const URL = "./";
+    let model, webcam, maxPredictions;
+    let port;
+
+    async function init() {
+      const modelURL = URL + "model.json";
+      const metadataURL = URL + "metadata.json";
+
+      model = await tmImage.load(modelURL, metadataURL);
+      maxPredictions = model.getTotalClasses();
+
+      webcam = new tmImage.Webcam(300, 300, true);
+      await webcam.setup();
+      await webcam.play();
+      window.requestAnimationFrame(loop);
+
+      document.getElementById("webcam-container").appendChild(webcam.canvas);
+    }
+
+    async function connectToArduino() {
+      try {
+        port = await navigator.serial.requestPort();
+        await port.open({ baudRate: 9600 });
+        document.getElementById("serialStatus").textContent = "✅ Порт подключен";
+      } catch (err) {
+        document.getElementById("serialStatus").textContent = "❌ Ошибка подключения";
+        console.error("Ошибка при подключении:", err);
+      }
+    }
+
+    async function loop() {
+      webcam.update();
+      await predict();
+      window.requestAnimationFrame(loop);
+    }
+
+    async function predict() {
+      const prediction = await model.predict(webcam.canvas);
+      let resultText = "Распознавание...";
+      let found = false;
+
+      prediction.forEach(p => {
+        if (p.probability > 0.95 && p.className === "Жест помощи") {
+          resultText = "🚨 Обнаружен жест помощи!";
+          found = true;
+        }
+      });
+
+      document.getElementById("status").textContent = resultText;
+
+      if (found && port && port.writable) {
+        const writer = port.writable.getWriter();
+        const data = new TextEncoder().encode("1");
+        await writer.write(data);
+        writer.releaseLock();
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>
