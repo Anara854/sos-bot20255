@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html>
 <head>
@@ -13,7 +12,10 @@
 </head>
 <body>
   <h1>SOS-Бот — Помощь рядом</h1>
-  <div id=""webcam" autoplay playsinline muted></div>
+  
+  <!-- Здесь будет видео с веб-камеры -->
+  <video id="webcam" autoplay playsinline muted></video>
+  
   <div id="status">Ожидание модели...</div>
   <button onclick="connectToArduino()">🔌 Подключиться к Arduino</button>
   <div id="serialStatus">Статус порта: не подключено</div>
@@ -25,18 +27,21 @@
     let port;
 
     async function init() {
+      // Загружаем модель и метаданные
       const modelURL = URL + "model.json";
       const metadataURL = URL + "metadata.json";
 
       model = await tmImage.load(modelURL, metadataURL);
       maxPredictions = model.getTotalClasses();
 
-      webcam = new tmImage.Webcam(300, 300, true);
+      // Настроим веб-камеру
+      webcam = new tmImage.Webcam(300, 300, true); // Камера будет 300x300 пикселей
       await webcam.setup();
       await webcam.play();
       window.requestAnimationFrame(loop);
 
-      document.getElementById("webcam-container").appendChild(webcam.canvas);
+      // Вставляем канвас веб-камеры в тег video
+      document.getElementById("webcam").appendChild(webcam.canvas);
     }
 
     async function connectToArduino() {
@@ -51,9 +56,9 @@
     }
 
     async function loop() {
-      webcam.update();
-      await predict();
-      window.requestAnimationFrame(loop);
+      webcam.update();  // Обновляем изображение с камеры
+      await predict();  // Делаем предсказание
+      window.requestAnimationFrame(loop);  // Повторяем цикл
     }
 
     async function predict() {
@@ -61,6 +66,7 @@
       let resultText = "Распознавание...";
       let found = false;
 
+      // Проверяем, если был распознан жест помощи
       prediction.forEach(p => {
         if (p.probability > 0.95 && p.className === "Жест помощи") {
           resultText = "🚨 Обнаружен жест помощи!";
@@ -68,16 +74,19 @@
         }
       });
 
+      // Отображаем результат
       document.getElementById("status").textContent = resultText;
 
+      // Если жест найден и подключено устройство, отправляем данные на Arduino
       if (found && port && port.writable) {
         const writer = port.writable.getWriter();
-        const data = new TextEncoder().encode("1");
+        const data = new TextEncoder().encode("1");  // Отправляем "1" на Arduino
         await writer.write(data);
         writer.releaseLock();
       }
     }
 
+    // Инициализация модели и камеры
     init();
   </script>
 </body>
